@@ -18,11 +18,11 @@
 | `/analytics/customers` | 顧客分析（無断キャンセル・リピート率） | owner, manager | 4 | ✅ |
 | `/suggestions` | スマート空き枠提案 | owner, manager | 5 | ✅ |
 | `/notifications` | 通知管理（履歴・送信状態・デモ通知の内容） | owner, manager | 3 | ✅ |
-| `/settings` | 店舗設定（店舗情報・営業時間・予約受付・顧客セグメント） | owner | 1 / 2 | ✅ |
+| `/settings` | 店舗設定（店舗情報・営業時間・予約受付・顧客セグメント・空き枠提案の重み） | owner | 1 / 2 / 5 | ✅ |
 | `/book/[slug]` | 公開予約ページ（8ステップ） | だれでも | 3 | ✅ |
 | `/book/[slug]/manage/[token]` | 予約の確認・変更・キャンセル | トークンを知っている人 | 3 | ✅ |
 | `/api/public/...` | 公開 API（空き枠・予約確定・変更・キャンセル。レート制限つき） | だれでも | 3 | ✅ |
-| `/api/cron/...` | リマインド作成・通知の送信・デモの片付け（見本の作り直しは Phase 6） | Vercel Cron（CRON_SECRET） | 3 / 6 | 🚧 |
+| `/api/cron/...` | リマインド作成・通知の送信・デモの片付け・見本の作り直し | Vercel Cron（CRON_SECRET） | 3 / 6 | ✅ |
 
 未実装の画面はサイドバーに出しません（`src/components/layout/nav.ts` の IMPLEMENTED）。
 
@@ -143,3 +143,18 @@
 ### Phase 5 時点で未実装のもの
 
 - 公開予約ページでのおすすめ枠の表示（公開ページは空き時間の一覧のまま）。AI による自然言語での提案（将来、同じモジュールの入出力を使って追加できる構成）。
+
+## Phase 6 で実装したもの
+
+- **見本の企業の毎日の作り直し**：定期処理（`/api/cron/cleanup`、毎日 3:00）で、公開予約ページの見本（`/book/demo-salon` など）を今日基準で作り直す。公開予約ページから見本に入った予約もここで消えるため、共有の見本データが恒久的に書き換わらない。ログイン用の利用者とパスワードは使い回す（`tests/db/showcase.test.ts`）。
+- **公開時の自動構築**：`npm run vercel-build`（`scripts/deploy/vercel-build.ts`）が本番デプロイのときだけ、環境変数の確認 → BYPASSRLS の確認 → マイグレーション → 見本の作成を行う。auth スキーマの無い PostgreSQL では Supabase の土台を先に作る。
+- **Supabase の実 DB への対応**：`auth.users` に行を作る処理で id を明示し（Supabase では既定値がない）、メールの一意制約の形に依存しないようにした。土台の `service_role` は、BYPASSRLS を付けられる接続のときだけ付ける。
+- **公開後の E2E**：GitHub Actions の「Production E2E」（手動実行、入力は公開 URL）。
+- **レスポンシブの確認**：全画面（一覧・詳細・分析・提案・設定・公開予約ページ）を幅 390px で表示し、横にはみ出す要素がないことを確認。
+- **テストの追加**：サービスとスタッフの登録・担当・休暇の E2E、見本の作り直しの DB テスト。
+- README・公開手順（docs/deployment.md）を確定。
+
+### Phase 6 時点で未確認のもの
+
+- 実際の Vercel・Supabase への公開（アカウントと環境変数の登録が必要。作業環境からは両サービスに接続できない）。
+- 実際のメール送信（Resend）と Supabase Auth でのログイン。

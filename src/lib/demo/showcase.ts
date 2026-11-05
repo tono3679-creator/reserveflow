@@ -22,15 +22,21 @@ export async function rebuildShowcase(sql: Sql, options: { password?: string; no
     await tx`select pg_advisory_xact_lock(hashtext('reserveflow:showcase'))`;
     await tx`select app_private.delete_organizations(array(select id from public.organizations where is_showcase))`;
     const ids: Record<string, string> = {};
+    // Supabase の auth.users は id に既定値がなく、email の一意制約も部分索引（条件が環境で違う）なので、
+    // on conflict に頼らず「メールで探して、あれば更新・なければ id を付けて追加」にする
     for (const [key, email] of Object.entries(SHOWCASE_USERS)) {
-      const [row] = await tx<{ id: string }[]>`
-        insert into auth.users (aud, role, email, encrypted_password, email_confirmed_at)
-        values ('authenticated', 'authenticated', ${email},
-                ${options.password ? tx`extensions.crypt(${options.password}, extensions.gen_salt('bf', 10))` : null}, now())
-        on conflict (email) where email is not null do update set
-          encrypted_password = coalesce(excluded.encrypted_password, auth.users.encrypted_password), updated_at = now()
-        returning id`;
-      ids[key] = row.id;
+      const hash = options.password ? tx`extensions.crypt(${options.password}, extensions.gen_salt('bf', 10))` : null;
+      const [existing] = await tx<{ id: string }[]>`select id from auth.users where email = ${email} order by created_at limit 1`;
+      if (existing) {
+        if (hash) await tx`update auth.users set encrypted_password = ${hash}, updated_at = now() where id = ${existing.id}`;
+        ids[key] = existing.id;
+      } else {
+        const [row] = await tx<{ id: string }[]>`
+          insert into auth.users (id, aud, role, email, encrypted_password, email_confirmed_at)
+          values (gen_random_uuid(), 'authenticated', 'authenticated', ${email}, ${hash}, now())
+          returning id`;
+        ids[key] = row.id;
+      }
     }
     for (const [i, bp] of BLUEPRINTS.entries()) {
       const data = generateDataset(bp, { now, seed: 20261105 + i * 101, slug: bp.slug });

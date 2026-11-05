@@ -8,7 +8,14 @@ do $$
 begin
   if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin noinherit; end if;
   if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin noinherit; end if;
-  if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin noinherit bypassrls; end if;
+  -- アプリは service_role を使わない（Supabase と同じ名前のロールがあるだけ）。BYPASSRLS は付けられる接続ユーザーのときだけ付ける
+  if not exists (select 1 from pg_roles where rolname = 'service_role') then
+    if (select rolsuper or rolbypassrls from pg_roles where rolname = current_user) then
+      create role service_role nologin noinherit bypassrls;
+    else
+      create role service_role nologin noinherit;
+    end if;
+  end if;
 end $$;
 -- 接続ユーザー（Supabase の postgres に相当）が、トランザクションの中でこれらのロールに切り替えられるようにする
 grant anon, authenticated, service_role to current_user;

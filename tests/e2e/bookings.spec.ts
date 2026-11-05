@@ -100,4 +100,33 @@ test.describe("予約：登録・重なりの拒否・変更・キャンセル",
     await page.waitForURL("**/customers");
     await endDemo(page);
   });
+  test("サービスとスタッフを登録し、担当と休暇を設定できる", async ({ page }) => {
+    await startDemo(page);
+    await menu(page, "メニュー・サービス").click();
+    await page.getByRole("button", { name: "サービスを追加" }).click();
+    let dialog = page.getByRole("dialog", { name: "サービスを追加" });
+    await dialog.getByLabel("サービス名").fill("E2E ヘッドマッサージ");
+    await dialog.getByLabel("料金（円）").fill("3300");
+    await dialog.getByLabel("所要時間（分）").fill("45");
+    await dialog.getByRole("button", { name: "追加する" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText("E2E ヘッドマッサージ")).toBeVisible();
+
+    await menu(page, "スタッフ管理").click();
+    await page.getByRole("button", { name: "スタッフを追加" }).click();
+    dialog = page.getByRole("dialog", { name: "スタッフを追加" });
+    await dialog.getByLabel("氏名").fill("E2E 太郎");
+    await dialog.getByRole("checkbox", { name: "E2E ヘッドマッサージ" }).check();
+    await dialog.getByRole("button", { name: "追加する" }).click();
+    // 追加するとスタッフの詳細へ移る
+    await page.waitForURL(/\/staff\/[0-9a-f-]{36}$/);
+    await expect(page.getByRole("heading", { name: "E2E 太郎", level: 1 })).toBeVisible();
+    await expect(page.getByText("E2E ヘッドマッサージ").first()).toBeVisible();
+
+    await page.getByLabel("日付").fill(daysAhead(5));
+    await page.getByLabel("理由（任意）").fill("E2E 研修");
+    await page.getByRole("button", { name: "登録", exact: true }).click();
+    await expect(page.getByText("E2E 研修")).toBeVisible();
+    await endDemo(page);
+  });
 });

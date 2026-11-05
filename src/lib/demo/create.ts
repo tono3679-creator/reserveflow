@@ -20,8 +20,8 @@ function shortId(): string {
 export async function createDemoEnvironment(sql: Sql, now: Date = new Date()): Promise<{ sessionId: string; ownerUserId: string }> {
   return sql.begin(async (tx) => {
     const users = await tx<{ id: string }[]>`
-      insert into auth.users (aud, role, is_anonymous, raw_user_meta_data)
-      select 'authenticated', 'authenticated', true, jsonb_build_object('demo', true) from generate_series(1, 3)
+      insert into auth.users (id, aud, role, is_anonymous, raw_user_meta_data)
+      select gen_random_uuid(), 'authenticated', 'authenticated', true, jsonb_build_object('demo', true) from generate_series(1, 3)
       returning id`;
     const [owner, manager, staff] = users.map((u) => u.id);
     const expiresAt = new Date(now.getTime() + DEMO_TTL_HOURS * 3600_000);
