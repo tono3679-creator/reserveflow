@@ -43,6 +43,7 @@ export default defineConfig({
       AUTH_PROVIDER: "local",
       DEMO_MAX_ACTIVE: "1000",
       DEMO_CREATE_LIMIT_PER_HOUR: "100000",
+      PUBLIC_BOOKING_LIMIT_PER_HOUR: "100000",
     },
   },
 });

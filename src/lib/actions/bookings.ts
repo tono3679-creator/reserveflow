@@ -1,7 +1,9 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { withAuth, type AppContext } from "@/lib/auth";
-import type { Tx } from "@/lib/db";
+import { db, type Tx } from "@/lib/db";
+import { processNotifications } from "@/lib/notifications/process";
 import { checkSlot, isBlocking } from "@/lib/scheduling/engine";
 import { loadSchedulingContext, loadServiceSpecs } from "@/lib/scheduling/load";
 import { localDate, zonedDateTime } from "@/lib/time";
@@ -40,6 +42,9 @@ function toRange(ctx: AppContext, v: BookingFormInput) {
 }
 
 function refresh() {
+  // 予約の変更で作られた通知イベントを、応答を返したあとに送る（送れなくても定期実行で再試行する）
+  after(() => processNotifications(db(), { limit: 20 }).catch((e) => console.error("notify", e)));
+  revalidatePath("/notifications");
   revalidatePath("/calendar");
   revalidatePath("/bookings", "layout");
   revalidatePath("/dashboard");

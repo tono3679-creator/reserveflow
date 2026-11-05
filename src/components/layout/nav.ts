@@ -30,7 +30,7 @@ export const NAV: NavItem[] = [
   { href: "/settings", label: "店舗設定", icon: Settings, permission: "settings.manage" },
 ];
 
-const IMPLEMENTED = new Set(["/dashboard", "/calendar", "/bookings", "/customers", "/staff", "/services", "/settings"]);
+const IMPLEMENTED = new Set(["/dashboard", "/calendar", "/bookings", "/customers", "/staff", "/services", "/notifications", "/settings"]);
 
 export function navFor(role: MemberRole): NavItem[] {
   return NAV.filter((item) => IMPLEMENTED.has(item.href) && (!item.permission || can(role, item.permission)));

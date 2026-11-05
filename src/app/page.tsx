@@ -5,10 +5,10 @@ import { DemoStartButton } from "@/components/marketing/demo-start";
 import { Button } from "@/components/ui/button";
 
 const DEMOS = [
-  { industry: "beauty_salon", icon: Scissors, title: "美容室", text: "スタイリスト5名・カット／カラーなど8メニュー" },
-  { industry: "chiropractic", icon: HandHeart, title: "整体院", text: "施術者3名・ベッド2台（設備の空きも判定）" },
-  { industry: "personal_gym", icon: Dumbbell, title: "パーソナルジム", text: "トレーナー指名必須・ブース3室" },
-  { industry: "rental_space", icon: Building, title: "レンタルスペース", text: "担当者なし・部屋単位の時間貸し" },
+  { industry: "beauty_salon", icon: Scissors, title: "美容室", text: "スタイリスト5名・カット／カラーなど8メニュー", slug: "demo-salon" },
+  { industry: "chiropractic", icon: HandHeart, title: "整体院", text: "施術者3名・ベッド2台（設備の空きも判定）", slug: "demo-seitai" },
+  { industry: "personal_gym", icon: Dumbbell, title: "パーソナルジム", text: "トレーナー指名必須・ブース3室", slug: "demo-gym" },
+  { industry: "rental_space", icon: Building, title: "レンタルスペース", text: "担当者なし・部屋単位の時間貸し", slug: "demo-space" },
 ];
 
 const FEATURES = [
@@ -55,7 +55,10 @@ export default function Home() {
                     <h3 className="font-semibold">{d.title}</h3>
                     <p className="text-keep mt-1 text-sm text-muted-foreground">{d.text}</p>
                   </div>
-                  <div className="mt-auto"><DemoStartButton industry={d.industry} label={`${d.title}で試す`} variant="outline" /></div>
+                  <div className="mt-auto grid gap-2">
+                    <DemoStartButton industry={d.industry} label={`${d.title}で試す`} variant="outline" />
+                    <Link href={`/book/${d.slug}`} className="text-center text-xs font-medium text-brand hover:underline">お客様側の予約ページを見る</Link>
+                  </div>
                 </div>
               ))}
             </div>

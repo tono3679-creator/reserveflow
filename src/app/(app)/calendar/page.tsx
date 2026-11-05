@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/common/page-header";
 import { CalendarView } from "@/components/calendar/calendar-view";
 import { requireContext } from "@/lib/auth";
@@ -41,6 +44,11 @@ export default async function CalendarPage() {
         description={canManage
           ? "予約の登録・日時や担当の変更ができます。重なる予約はサーバーとデータベースが拒否します。"
           : "ご自身が担当する予約が表示されます。来店・完了の記録ができます。"}
+        actions={
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/book/${ctx.location.slug}`} target="_blank" rel="noopener"><ExternalLink aria-hidden />公開予約ページ</Link>
+          </Button>
+        }
       />
       <CalendarView
         timezone={tz}
