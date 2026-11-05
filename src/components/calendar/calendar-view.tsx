@@ -27,7 +27,7 @@ import { zonedDateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { StaffDayView } from "./staff-day-view";
 
-type ViewKey = "dayGridMonth" | "timeGridWeek" | "timeGridDay" | "staff";
+export type ViewKey = "dayGridMonth" | "timeGridWeek" | "timeGridDay" | "staff";
 const VIEWS: { key: ViewKey; label: string }[] = [
   { key: "dayGridMonth", label: "月" },
   { key: "timeGridWeek", label: "週" },
@@ -55,7 +55,7 @@ type MovePayload = { bookingId: string; version: number; startsAt: string; endsA
 type PendingMove = { payload: MovePayload; warnings: string[]; revert: () => void };
 
 export function CalendarView({
-  timezone, options, canManage, canCreateCustomer, slotMin, slotMax, today,
+  timezone, options, canManage, canCreateCustomer, slotMin, slotMax, today, initialDate, initialView = "timeGridWeek",
 }: {
   timezone: string;
   options: BookingOptions;
@@ -64,12 +64,15 @@ export function CalendarView({
   slotMin: string;
   slotMax: string;
   today: string;
+  /** 最初に表示する日・表示モード（空き枠提案の「カレンダーで見る」から） */
+  initialDate?: string;
+  initialView?: ViewKey;
 }) {
   const router = useRouter();
   const calendarRef = useRef<FullCalendar>(null);
-  const [view, setView] = useState<ViewKey>("timeGridWeek");
+  const [view, setView] = useState<ViewKey>(initialView);
   const [title, setTitle] = useState("");
-  const [staffDate, setStaffDate] = useState(today);
+  const [staffDate, setStaffDate] = useState(initialDate ?? today);
   const [includeCancelled, setIncludeCancelled] = useState(false);
   const [staffFilter, setStaffFilter] = useState("");
   const [selected, setSelected] = useState<CalendarBooking | null>(null);
@@ -228,7 +231,8 @@ export function CalendarView({
         <FullCalendar
           ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="timeGridWeek"
+          initialView={initialView === "staff" ? "timeGridDay" : initialView}
+          initialDate={initialDate}
           locale={jaLocale}
           timeZone="UTC"
           now={() => toWall(new Date(), timezone)}

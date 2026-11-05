@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/common/page-header";
-import { CalendarView } from "@/components/calendar/calendar-view";
+import { CalendarView, type ViewKey } from "@/components/calendar/calendar-view";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/auth/roles";
 import { getBookingOptions } from "@/lib/data/bookings";
@@ -21,7 +21,12 @@ function hourRange(rows: { opens: string; closes: string }[]): { slotMin: string
   return { slotMin: pad(min), slotMax: pad(max) };
 }
 
-export default async function CalendarPage() {
+const VIEW_PARAM: Record<string, ViewKey> = { month: "dayGridMonth", week: "timeGridWeek", day: "timeGridDay", staff: "staff" };
+
+export default async function CalendarPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams;
+  const dateParam = typeof sp.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : undefined;
+  const viewParam = typeof sp.view === "string" && Object.hasOwn(VIEW_PARAM, sp.view) ? VIEW_PARAM[sp.view] : undefined;
   const ctx = await requireContext();
   const tz = ctx.location.timezone;
   const { options, hours } = await asUser(ctx.userId, async (tx) => {
@@ -58,6 +63,8 @@ export default async function CalendarPage() {
         slotMin={slotMin}
         slotMax={slotMax}
         today={localDate(new Date(), tz)}
+        initialDate={dateParam}
+        initialView={viewParam}
       />
     </div>
   );

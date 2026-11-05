@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { withAuth } from "@/lib/auth";
 import type { Tx } from "@/lib/db";
 import { bookingRulesSchema, businessHoursSchema, locationInfoSchema, segmentRulesSchema } from "@/lib/validation/settings";
+import { suggestionWeightsSchema } from "@/lib/validation/suggestions";
 import { runAction, UserFacingError, type ActionResult } from "./result";
 
 /**
@@ -69,6 +70,22 @@ export async function updateSegmentRules(input: unknown): Promise<ActionResult> 
     revalidatePath("/settings");
     revalidatePath("/customers", "layout");
   }, "顧客セグメントの基準を保存しました");
+}
+
+/** スマート空き枠提案のスコアの重み */
+export async function updateSuggestionWeights(input: unknown): Promise<ActionResult> {
+  return runAction(async () => {
+    const v = suggestionWeightsSchema.parse(input);
+    await withAuth("settings.manage", async (tx, ctx) => {
+      const rows = await tx`update public.tenant_settings set
+          weight_preferred_time = ${v.preferredTime}, weight_gap = ${v.gap}, weight_balance = ${v.balance}, weight_idle = ${v.idle}
+        where location_id = ${ctx.location.id} returning location_id`;
+      if (rows.length === 0) throw new UserFacingError("この店舗を変更する権限がありません");
+      await audit(tx, ctx.organizationId, "suggestion_weights.update", ctx.location.id, v);
+    });
+    revalidatePath("/settings");
+    revalidatePath("/suggestions");
+  }, "空き枠提案の重みを保存しました");
 }
 
 /** 操作履歴（書き込みは DB 関数経由。利用者が直接 audit_logs に書く権限はない） */
