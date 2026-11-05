@@ -174,12 +174,18 @@ export function generateDataset(bp: LocationBlueprint, options: { now: Date; see
   const reservedNoVisit = Math.round(bp.customers * 0.04);
   const newLimit = bp.customers - reservedNoVisit;
 
-  const pickCustomer = (date: string, isFuture: boolean): CustomerState => {
+  // 新規の顧客は期間全体に散らす（最初の数か月で顧客を使い切らないよう、その日までに登場してよい人数を決める）
+  const pickCustomer = (date: string, isFuture: boolean, progress: number): CustomerState => {
+    const allowedNew = Math.ceil(newLimit * (0.15 + 0.85 * progress));
+    const canNew = nextNew < Math.min(newLimit, allowedNew);
     const eligible = states.filter((s) => s.visits > 0 && s.nextEligible !== null && s.nextEligible <= date && !(s.kind === "once" && s.visits >= 1));
     const wantNew = rng() < (isFuture ? 0.18 : 0.27) || eligible.length === 0;
-    if (wantNew && nextNew < newLimit) return states[nextNew++];
+    if (wantNew && canNew) return states[nextNew++];
     if (eligible.length > 0) return weightedPick(rng, eligible, (s) => (s.kind === "frequent" ? 3 : 1.5))!;
-    return states[randomInt(rng, 0, Math.max(0, nextNew - 1))];
+    // 来店の間隔が空いていない人しかいなければ、来店済みの人の中から選ぶ（1回きりの人は除く）
+    const seen = states.filter((s) => s.visits > 0 && s.kind !== "once");
+    if (seen.length > 0) return weightedPick(rng, seen, (s) => (s.kind === "frequent" ? 3 : 1.5))!;
+    return nextNew < newLimit ? states[nextNew++] : states[randomInt(rng, 0, Math.max(0, nextNew - 1))];
   };
 
   // 日ごとの予約数の目安
@@ -237,7 +243,7 @@ export function generateDataset(bp: LocationBlueprint, options: { now: Date; see
         const startsAt = zonedDateTime(day.date, `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`, TIMEZONE);
         const endsAt = new Date(startsAt.getTime() + service.bp.duration * 60_000);
         const isFuture = startsAt > now;
-        const customer = pickCustomer(day.date, isFuture);
+        const customer = pickCustomer(day.date, isFuture, (day.offset + PAST_DAYS) / (PAST_DAYS + FUTURE_DAYS));
         const firstVisit = customer.visits === 0;
 
         // 予約を受けた日時：過去の予約は 0〜21 日前、先の予約は今日まで

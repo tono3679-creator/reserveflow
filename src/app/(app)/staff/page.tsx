@@ -59,8 +59,8 @@ export default async function StaffPage() {
                           <dd className="font-semibold tabular">{s.stats.utilization === null ? "—" : formatPercent(s.stats.utilization * 100)}</dd>
                         </div>
                         <div>
-                          <dt className="text-xs text-muted-foreground">無断キャンセル</dt>
-                          <dd className="font-semibold tabular">{s.stats.noShowRate === null ? "—" : formatPercent(s.stats.noShowRate * 100)}</dd>
+                          <dt className="text-xs text-muted-foreground">リピート率</dt>
+                          <dd className="font-semibold tabular">{s.stats.repeatRate === null ? "—" : formatPercent(s.stats.repeatRate * 100)}</dd>
                         </div>
                         {showSales ? (
                           <div><dt className="text-xs text-muted-foreground">売上</dt><dd className="font-semibold tabular">{formatYen(s.stats.revenue)}</dd></div>

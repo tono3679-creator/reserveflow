@@ -51,6 +51,15 @@
   --chart-4: oklch(0.72 0.17 55);
   --chart-5: oklch(0.6 0.15 152);
   --chart-6: oklch(0.62 0.14 300);
+  /* 分析のグラフの系列色（この順で使う。色覚の違いでも隣どうしを見分けられることを確認した並び） */
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-5: #e87ba4;
+  --viz-6: #6250d6;
+  --viz-grid: #e7e7e4;
+  --viz-axis: #6b6a66;
 }
 
 @theme inline {

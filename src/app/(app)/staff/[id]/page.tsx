@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { z } from "zod";
+import { ChartCard } from "@/components/analytics/chart-card";
+import { SimpleBarChart } from "@/components/analytics/charts";
 import { PageHeader } from "@/components/common/page-header";
 import { StaffFormDialog } from "@/components/staff/staff-form-dialog";
 import { StaffScheduleForm } from "@/components/staff/staff-schedule-form";
 import { TimeOffManager } from "@/components/staff/time-off-manager";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { monthly } from "@/lib/analytics/metrics";
 import { requirePermission } from "@/lib/auth";
 import { can } from "@/lib/auth/roles";
 import { getStaffDetail, STATS_DAYS } from "@/lib/data/staff";
@@ -25,18 +28,23 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
     if (!staff) return null;
     const services = await tx<{ id: string; name: string; category: string | null }[]>`
       select id, name, category from public.services where location_id = ${ctx.location.id} and is_active order by sort_order, name`;
-    return { staff, services };
+    const months = await monthly(tx, ctx.location.id, tz, 6, new Date(), { staffId: id });
+    return { staff, services, months };
   });
   if (!data) notFound();
-  const { staff: s, services } = data;
+  const { staff: s, services, months } = data;
+  const showSales = can(ctx.role, "sales.view");
   const st = s.stats;
   const assigned = services.filter((x) => s.serviceIds.includes(x.id));
   const stats = st ? [
-    { label: "予約件数", value: `${st.bookings}件` },
-    { label: "来店", value: `${st.visits}件` },
+    { label: "担当予約件数", value: `${st.bookings}件`, sub: `来店 ${st.visits}件` },
+    ...(showSales ? [
+      { label: "売上（来店分）", value: formatYen(st.revenue) },
+      { label: "平均客単価", value: st.avgPrice === null ? "—" : formatYen(st.avgPrice) },
+    ] : []),
     { label: "稼働率", value: st.utilization === null ? "—" : formatPercent(st.utilization * 100), sub: `${formatNumber(Math.round(st.bookedMinutes / 60))}時間 ／ 勤務 ${formatNumber(Math.round(st.workingMinutes / 60))}時間` },
-    { label: "無断キャンセル率", value: st.noShowRate === null ? "—" : formatPercent(st.noShowRate * 100), sub: `${st.noShows}件` },
-    ...(can(ctx.role, "sales.view") ? [{ label: "売上（来店分）", value: formatYen(st.revenue) }] : []),
+    { label: "リピート率", value: st.repeatRate === null ? "—" : formatPercent(st.repeatRate * 100), sub: `${st.repeaters} ／ ${st.visitors}人` },
+    { label: "無断キャンセル率", value: st.noShowRate === null ? "—" : formatPercent(st.noShowRate * 100), sub: `${st.noShows} ／ ${st.noShowTarget}件` },
     { label: "今後7日の予約", value: `${st.upcoming}件` },
   ] : [];
 
@@ -51,11 +59,14 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
       {st && (
         <Card>
           <CardHeader>
-            <CardTitle>直近{STATS_DAYS}日の実績</CardTitle>
-            <CardDescription>無断キャンセル率 = 無断キャンセル ÷（来店 + 無断キャンセル）</CardDescription>
+            <CardTitle>直近{STATS_DAYS}日の実績（昨日まで）</CardTitle>
+            <CardDescription className="text-xs">
+              稼働率 = 予約で埋まった時間 ÷ 勤務時間（休憩・休暇を除く）。リピート率 = 担当した顧客のうち、同じスタッフを累計2回以上利用した顧客の割合。
+              無断キャンセル率の母数は店舗キャンセルを除く担当予約。
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-7">
               {stats.map((x) => (
                 <div key={x.label}>
                   <dt className="text-xs text-muted-foreground">{x.label}</dt>
@@ -67,6 +78,13 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
           </CardContent>
         </Card>
       )}
+      <ChartCard title={showSales ? "月別の売上（直近6か月）" : "月別の担当予約件数（直近6か月）"}
+        description={showSales ? "このスタッフが担当した予約のうち、来店分の料金" : "キャンセルを除く（今月は予定を含む）"}
+        table={{ columns: showSales ? ["月", "予約件数", "来店", "売上"] : ["月", "予約件数", "来店"],
+          rows: months.map((m) => showSales ? [m.month, m.bookings, m.visits, formatYen(m.sales)] : [m.month, m.bookings, m.visits]) }}>
+        <SimpleBarChart data={months.map((m) => ({ label: `${Number(m.month.slice(5, 7))}月`, value: showSales ? m.sales : m.bookings }))}
+          format={showSales ? "yen" : "count"} name={showSales ? "売上" : "予約件数"} ariaLabel="このスタッフの月別実績の棒グラフ" height={200} />
+      </ChartCard>
       <div className="grid gap-6 xl:grid-cols-[1fr_20rem]">
         <Card>
           <CardHeader>

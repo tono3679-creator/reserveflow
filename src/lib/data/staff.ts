@@ -1,20 +1,28 @@
 import "server-only";
 import type { Tx } from "@/lib/db";
-import { datesBetween, staffDay } from "@/lib/scheduling/engine";
+import { capacity } from "@/lib/analytics/capacity";
+import { byGroup } from "@/lib/analytics/metrics";
+import { periodRange } from "@/lib/analytics/period";
+import { datesBetween } from "@/lib/scheduling/engine";
 import { loadSchedulingContext } from "@/lib/scheduling/load";
 import { addDays, localDate } from "@/lib/time";
 
 export const STATS_DAYS = 30;
 
 export type StaffStats = {
-  bookings: number;      // 期間内の予約（キャンセルを含む）
+  bookings: number;      // 期間内の担当予約（キャンセルを除く）
   visits: number;        // 来店済み・サービス完了
   noShows: number;
-  revenue: number;       // 来店済み・サービス完了の料金
-  bookedMinutes: number; // 枠を占有した予約の時間（準備時間を除く）
+  revenue: number;       // 来店した予約の料金
+  avgPrice: number | null;
+  bookedMinutes: number; // 勤務時間のうち予約で埋まった時間（前後の準備時間を含む）
   workingMinutes: number;
   utilization: number | null; // bookedMinutes ÷ workingMinutes
-  noShowRate: number | null;  // 無断キャンセル ÷（来店 + 無断キャンセル）
+  noShowRate: number | null;  // 無断キャンセル ÷ 母数（店舗キャンセルを除く予約。分析画面と同じ定義）
+  noShowTarget: number;
+  repeatRate: number | null;  // 担当した顧客のうち、同じスタッフを累計2回以上利用した顧客の割合
+  visitors: number;
+  repeaters: number;
   upcoming: number;      // 今日から7日間の予約
 };
 
@@ -24,46 +32,36 @@ export type StaffRow = {
 };
 
 /**
- * スタッフの一覧と直近30日の実績。
+ * スタッフの一覧と直近30日（昨日まで）の実績。計算は分析画面（src/lib/analytics）と同じ。
  * 稼働率 = 予約で埋まった時間 ÷ 勤務時間（基本勤務と休暇・勤務変更から、休憩を除いて計算）。
  */
 export async function listStaff(tx: Tx, locationId: string, timezone: string, now = new Date()): Promise<StaffRow[]> {
   const today = localDate(now, timezone);
-  const from = addDays(today, -STATS_DAYS);
-  const to = addDays(today, -1);
-  const [staff, scheduling, agg] = await Promise.all([
+  const period = { from: addDays(today, -STATS_DAYS), to: addDays(today, -1) };
+  const range = periodRange(period, timezone);
+  const [staff, scheduling, groups, upcoming] = await Promise.all([
     tx<{ id: string; name: string; title: string | null; email: string | null; color: string; is_active: boolean; member_id: string | null; service_ids: string[] }[]>`
       select s.id, s.name, s.title, s.email, s.color, s.is_active, s.member_id,
              array(select ss.service_id from public.service_staff ss where ss.staff_id = s.id) service_ids
         from public.staff s where s.location_id = ${locationId} order by s.is_active desc, s.sort_order, s.name`,
-    loadSchedulingContext(tx, locationId, from, to),
-    tx<{ staff_id: string; bookings: number; visits: number; no_shows: number; revenue: number; booked_minutes: number; upcoming: number }[]>`
-      select b.staff_id,
-             count(*) filter (where b.starts_at >= p.lo and b.starts_at < p.hi)::int bookings,
-             count(*) filter (where b.starts_at >= p.lo and b.starts_at < p.hi and b.status in ('checked_in', 'completed'))::int visits,
-             count(*) filter (where b.starts_at >= p.lo and b.starts_at < p.hi and b.status = 'no_show')::int no_shows,
-             coalesce(sum(b.price) filter (where b.starts_at >= p.lo and b.starts_at < p.hi and b.status in ('checked_in', 'completed')), 0)::int revenue,
-             coalesce(sum(extract(epoch from b.ends_at - b.starts_at) / 60) filter (where b.starts_at >= p.lo and b.starts_at < p.hi and public.booking_blocks_slot(b.status)), 0)::int booked_minutes,
-             count(*) filter (where b.starts_at >= p.hi and b.starts_at < p.hi + interval '7 days' and public.booking_blocks_slot(b.status))::int upcoming
-        from public.bookings b
-        join public.locations l on l.id = b.location_id
-        cross join lateral (select (${from}::date)::timestamp at time zone l.timezone lo, (${today}::date)::timestamp at time zone l.timezone hi) p
-       where b.location_id = ${locationId} and b.staff_id is not null
-       group by b.staff_id`,
+    loadSchedulingContext(tx, locationId, period.from, period.to),
+    byGroup(tx, locationId, range, "staff", now),
+    tx<{ staff_id: string; n: number }[]>`
+      select b.staff_id, count(*)::int n from public.bookings b
+       where b.location_id = ${locationId} and b.staff_id is not null and public.booking_blocks_slot(b.status)
+         and b.starts_at >= ${range.hi} and b.starts_at < ${range.hi}::timestamptz + interval '7 days'
+       group by 1`,
   ]);
-  const days = datesBetween(from, to);
+  const cap = scheduling ? capacity(scheduling, datesBetween(period.from, period.to)) : null;
   return staff.map((s) => {
-    const a = agg.find((x) => x.staff_id === s.id);
-    const info = scheduling?.staff.find((x) => x.id === s.id);
-    let workingMinutes = 0;
-    if (scheduling && info) {
-      for (const d of days) for (const w of staffDay(scheduling, info, d).windows) workingMinutes += (w.end - w.start) / 60_000;
-    }
+    const g = groups.find((x) => x.id === s.id);
+    const c = cap?.byStaff.find((x) => x.staffId === s.id);
     const stats: StaffStats | null = s.is_active ? {
-      bookings: a?.bookings ?? 0, visits: a?.visits ?? 0, noShows: a?.no_shows ?? 0, revenue: a?.revenue ?? 0,
-      bookedMinutes: a?.booked_minutes ?? 0, workingMinutes, upcoming: a?.upcoming ?? 0,
-      utilization: workingMinutes > 0 ? (a?.booked_minutes ?? 0) / workingMinutes : null,
-      noShowRate: (a?.visits ?? 0) + (a?.no_shows ?? 0) > 0 ? (a?.no_shows ?? 0) / ((a?.visits ?? 0) + (a?.no_shows ?? 0)) : null,
+      bookings: g?.bookings ?? 0, visits: g?.visits ?? 0, noShows: g?.noShow.noShows ?? 0, revenue: g?.sales ?? 0, avgPrice: g?.avgPrice ?? null,
+      bookedMinutes: Math.round(c?.bookedMinutes ?? 0), workingMinutes: Math.round(c?.availableMinutes ?? 0), utilization: c?.rate ?? null,
+      noShowRate: g?.noShow.noShowRate ?? null, noShowTarget: g?.noShow.target ?? 0,
+      repeatRate: g?.repeatRate ?? null, visitors: g?.visitors ?? 0, repeaters: g?.repeaters ?? 0,
+      upcoming: upcoming.find((x) => x.staff_id === s.id)?.n ?? 0,
     } : null;
     return {
       id: s.id, name: s.name, title: s.title, email: s.email, color: s.color, isActive: s.is_active, memberId: s.member_id,
