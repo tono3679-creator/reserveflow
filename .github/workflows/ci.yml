@@ -43,6 +43,8 @@ jobs:
         run: npx playwright test
         env:
           E2E_COMMAND: npx next start -p 3100
+          # CI のテスト専用の値（本番の秘密ではない。本番は Vercel の環境変数に別の値を登録する）
+          APP_SECRET: ci-only-app-secret-for-e2e-0123456789abcdef
           E2E_LOGIN_PASSWORD: ci-login-password
       - uses: actions/upload-artifact@v4
         if: failure()
