@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { withAuth } from "@/lib/auth";
 import type { Tx } from "@/lib/db";
-import { bookingRulesSchema, businessHoursSchema, locationInfoSchema } from "@/lib/validation/settings";
+import { bookingRulesSchema, businessHoursSchema, locationInfoSchema, segmentRulesSchema } from "@/lib/validation/settings";
 import { runAction, UserFacingError, type ActionResult } from "./result";
 
 /**
@@ -53,6 +53,22 @@ export async function updateBookingRules(input: unknown): Promise<ActionResult> 
     });
     revalidatePath("/settings");
   }, "予約受付の設定を保存しました");
+}
+
+export async function updateSegmentRules(input: unknown): Promise<ActionResult> {
+  return runAction(async () => {
+    const v = segmentRulesSchema.parse(input);
+    await withAuth("settings.manage", async (tx, ctx) => {
+      const rows = await tx`update public.tenant_settings set
+          segment_repeat_min_visits = ${v.repeatMinVisits}, segment_vip_min_visits = ${v.vipMinVisits},
+          segment_vip_min_spend = ${v.vipMinSpend}, segment_dormant_days = ${v.dormantDays}
+        where location_id = ${ctx.location.id} returning location_id`;
+      if (rows.length === 0) throw new UserFacingError("この店舗を変更する権限がありません");
+      await audit(tx, ctx.organizationId, "segment_rules.update", ctx.location.id, v);
+    });
+    revalidatePath("/settings");
+    revalidatePath("/customers", "layout");
+  }, "顧客セグメントの基準を保存しました");
 }
 
 /** 操作履歴（書き込みは DB 関数経由。利用者が直接 audit_logs に書く権限はない） */

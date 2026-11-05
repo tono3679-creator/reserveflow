@@ -4,9 +4,16 @@ import { AuthError } from "@/lib/auth";
 
 export type ActionResult<T = void> =
   | { ok: true; data: T; message?: string }
-  | { ok: false; error: string; fieldErrors?: Record<string, string> };
+  | { ok: false; error: string; fieldErrors?: Record<string, string>; warnings?: string[] };
 
 export class UserFacingError extends Error {}
+
+/** 確認すれば続けられる警告（営業時間外・勤務時間外など） */
+export class NeedsConfirmation extends Error {
+  constructor(readonly warnings: string[]) {
+    super("確認が必要です");
+  }
+}
 
 /** PostgreSQL のエラーを、利用者に見せてよい文に置き換える（内部の情報は出さない） */
 export function describeDbError(error: unknown): string | null {
@@ -42,6 +49,7 @@ export async function runAction<T>(fn: () => Promise<T>, message?: string): Prom
     const data = await fn();
     return { ok: true, data, message };
   } catch (error) {
+    if (error instanceof NeedsConfirmation) return { ok: false, error: error.message, warnings: error.warnings };
     if (error instanceof AuthError || error instanceof UserFacingError) return { ok: false, error: error.message };
     if (error instanceof z.ZodError) {
       const fieldErrors: Record<string, string> = {};

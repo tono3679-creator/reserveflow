@@ -43,3 +43,11 @@ export const bookingRulesSchema = z.object({
   remindSameDay: z.boolean(),
 });
 export type BookingRulesInput = z.infer<typeof bookingRulesSchema>;
+
+export const segmentRulesSchema = z.object({
+  repeatMinVisits: z.number({ message: "2以上の整数で入力してください" }).int().min(2, "2回以上にしてください").max(100, "100回以内にしてください"),
+  vipMinVisits: z.number({ message: "2以上の整数で入力してください" }).int().min(2, "2回以上にしてください").max(1000, "1000回以内にしてください"),
+  vipMinSpend: z.number({ message: "金額を入力してください" }).int().min(0, "0円以上にしてください").max(100_000_000, "1億円以下にしてください"),
+  dormantDays: z.number({ message: "日数を入力してください" }).int().min(14, "14日以上にしてください").max(730, "730日以内にしてください"),
+});
+export type SegmentRulesInput = z.infer<typeof segmentRulesSchema>;

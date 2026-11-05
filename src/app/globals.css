@@ -128,3 +128,48 @@
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
+
+/* ---- 予約カレンダー（FullCalendar の見た目を合わせる） ---- */
+.rf-calendar .fc {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: var(--card);
+  --fc-neutral-bg-color: var(--muted);
+  --fc-today-bg-color: color-mix(in oklab, var(--primary) 6%, transparent);
+  --fc-now-indicator-color: var(--destructive);
+  --fc-highlight-color: color-mix(in oklab, var(--primary) 15%, transparent);
+  font-size: 0.8125rem;
+}
+.rf-calendar .fc .fc-col-header-cell-cushion,
+.rf-calendar .fc .fc-daygrid-day-number {
+  color: var(--foreground);
+  text-decoration: none;
+  font-weight: 500;
+}
+.rf-calendar .fc .fc-timegrid-slot {
+  height: 2rem;
+}
+.rf-calendar .fc .fc-timegrid-slot-label-cushion {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+  font-size: 0.6875rem;
+}
+.rf-calendar .fc-event {
+  cursor: pointer;
+  border-radius: 0.375rem;
+}
+.rf-calendar .fc-daygrid-event {
+  white-space: normal;
+}
+.rf-event-cancelled {
+  opacity: 0.45;
+  text-decoration: line-through;
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgb(255 255 255 / 0.25) 6px 12px);
+}
+.rf-event-done {
+  opacity: 0.75;
+}
+/* スタッフ別表示の勤務時間外・休憩 */
+.rf-offhours {
+  background-color: color-mix(in oklab, var(--muted) 80%, transparent);
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in oklab, var(--border) 60%, transparent) 6px 7px);
+}

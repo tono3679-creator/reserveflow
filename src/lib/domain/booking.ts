@@ -25,3 +25,30 @@ export const STATUS_TONE: Record<BookingStatus, "info" | "brand" | "success" | "
 export function blocksSlot(status: BookingStatus): boolean {
   return status === "confirmed" || status === "checked_in" || status === "completed";
 }
+
+/** ステータスを変更できる組み合わせ（DB 関数 set_booking_status と同じ） */
+const TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
+  confirmed: ["checked_in", "completed", "no_show", "cancelled_customer", "cancelled_store"],
+  checked_in: ["completed", "confirmed", "no_show"],
+  completed: ["checked_in", "confirmed"],
+  no_show: ["confirmed", "checked_in", "completed"],
+  cancelled_customer: ["confirmed"],
+  cancelled_store: ["confirmed"],
+};
+
+const CANCELLED: BookingStatus[] = ["cancelled_customer", "cancelled_store"];
+
+/** 画面に出すステータス変更の選択肢（役割と開始時刻も考える） */
+export function nextStatuses(status: BookingStatus, options: { canCancel: boolean; startsAt: Date; now?: Date }): BookingStatus[] {
+  const now = options.now ?? new Date();
+  const started = options.startsAt.getTime() <= now.getTime() + 3_600_000;
+  return TRANSITIONS[status].filter((s) => {
+    if (!options.canCancel && (CANCELLED.includes(s) || CANCELLED.includes(status))) return false;
+    if (!started && (s === "checked_in" || s === "completed" || s === "no_show")) return false;
+    return true;
+  });
+}
+
+export function isCancelled(status: BookingStatus): boolean {
+  return CANCELLED.includes(status);
+}
