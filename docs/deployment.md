@@ -16,7 +16,7 @@
 ### 1. Supabase でプロジェクトを作る
 
 1. Supabase で New project を作る（Region は Northeast Asia (Tokyo)）。Database password は控えておく。
-2. Project Settings → Database → Connection string で、次の2つをコピーする（`[YOUR-PASSWORD]` は 1. のパスワードに置き換える）。
+2. プロジェクト画面の上部のバーにある **Connect** ボタンを押し、Connection String タブで次の2つをコピーする（`[YOUR-PASSWORD]` は 1. のパスワードに置き換える）。
    - **Transaction pooler**（ポート 6543）… アプリの接続用 → `DATABASE_URL`
    - **Session pooler**（ポート 5432）… マイグレーション用 → `DATABASE_URL_UNPOOLED`
    - Direct connection は IPv6 だけのため、Vercel のビルドからは使えません。
