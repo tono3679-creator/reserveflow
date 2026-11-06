@@ -1,0 +1,34 @@
+name: Production E2E
+
+# 公開した URL に対して E2E を実行する（手動）。DB の接続情報は使わない。
+# テストはそれぞれ「デモを体験」で専用の環境を作り、終わったら画面の「デモを終了する」で片付ける。
+# 見本の企業へのログインも確認する場合は、リポジトリの Secret に E2E_LOGIN_PASSWORD（Vercel の SEED_LOGIN_PASSWORD と同じ値）を登録する。
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "公開 URL（例 https://reserveflow.vercel.app）"
+        required: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: E2E
+        run: npx playwright test
+        env:
+          E2E_BASE_URL: ${{ inputs.base_url }}
+          E2E_LOGIN_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
