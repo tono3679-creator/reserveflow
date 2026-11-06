@@ -74,6 +74,7 @@ GitHub の Actions → **Production E2E** → Run workflow で、`base_url` に�
 
 ## 補足
 
+- `vercel.json` でサーバーの場所を東京（`hnd1`）、フレームワークを Next.js に固定しています。データベース（Supabase の Tokyo）と同じ地域に置かないと、1回の表示で何十回もの問い合わせが海を往復して遅くなります。
 - ブラウザから Supabase の Data API（PostgREST）は使いません。Supabase の Project Settings → Data API で無効にしておくと、公開される入口を減らせます。
 - Supabase 以外の PostgreSQL（Neon など）でも動きます。auth スキーマが無い DB では、ビルド時に Supabase の土台（`db/local/supabase-shim.sql`）を先に作ります。接続する利用者には BYPASSRLS が必要です。
   管理者権限のない利用者（DB の所有者＋BYPASSRLS）での初回構築・2回目のビルド・E2E 全件は、ローカルの別クラスタで確認済みです。
